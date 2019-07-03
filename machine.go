@@ -15,19 +15,22 @@ package firecracker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
+
 	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -96,6 +99,9 @@ type Config struct {
 
 	// JailerCfg is configuration specific for the jailer process.
 	JailerCfg JailerConfig
+
+	// TODO how does this overlap with JailerConfig? If at all?
+	NetNSPath string
 }
 
 // Validate will ensure that the required fields are set and that
@@ -316,6 +322,40 @@ func (m *Machine) startVMM(ctx context.Context) error {
 	m.logger.Printf("Called startVMM(), setting up a VMM on %s", m.cfg.SocketPath)
 
 	errCh := make(chan error)
+
+	// TODO don't hardcode
+	m.cfg.NetNSPath = "/tmp/fcNS"
+
+	if m.cfg.NetNSPath != "" {
+		// Go docs say that if you have OSThread locked when you call start an os/exec.Command,
+		// the child process will inherit all thread-local state, including NS.
+		// https://golang.org/pkg/os/exec/#Cmd.Run
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		origNetns, err := os.Open("/proc/thread-self/ns/net")
+		if err != nil {
+			return errors.Wrap(err, "failed to open current net ns")
+		}
+		defer origNetns.Close()
+
+		newNetns, err := os.Open(m.cfg.NetNSPath)
+		if err != nil {
+			return errors.Wrap(err, "failed to open new net ns")
+		}
+		defer newNetns.Close()
+
+		err = unix.Setns(int(newNetns.Fd()), unix.CLONE_NEWNET)
+		if err != nil {
+			return errors.Wrap(err, "failed to switch thread net ns")
+		}
+		defer func() {
+			setnsErr := unix.Setns(int(origNetns.Fd()), unix.CLONE_NEWNET)
+			if setnsErr != nil {
+				panic(setnsErr.Error())
+			}
+		}()
+	}
 
 	err := m.cmd.Start()
 	if err != nil {
