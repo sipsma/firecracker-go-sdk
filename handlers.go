@@ -178,7 +178,7 @@ var AttachDrivesHandler = Handler{
 var CreateNetworkInterfacesHandler = Handler{
 	Name: CreateNetworkInterfacesHandlerName,
 	Fn: func(ctx context.Context, m *Machine) error {
-		return m.createNetworkInterfaces(ctx, m.cfg.NetworkInterfaces...)
+		return m.createNetworkInterfaces(ctx, m.cfg.Network.NetworkInterfaces...)
 	},
 }
 

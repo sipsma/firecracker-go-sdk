@@ -15,19 +15,28 @@ package firecracker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
+
+	"github.com/containernetworking/cni/libcni"
+	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/firecracker-microvm/firecracker-containerd/tc-redirect/util"
 	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -68,9 +77,8 @@ type Config struct {
 	// microVM.
 	Drives []models.Drive
 
-	// NetworkInterfaces specifies the tap devices that should be made available
-	// to the microVM.
-	NetworkInterfaces []NetworkInterface
+	// TODO comment
+	Network NetworkConfiguration
 
 	// FifoLogWriter is an io.Writer that is used to redirect the contents of the
 	// fifo log to the writer.
@@ -172,7 +180,17 @@ func (m *Machine) PID() (int, error) {
 	return m.cmd.Process.Pid, nil
 }
 
-// NetworkInterface represents a Firecracker microVM's network interface.
+type NetworkConfiguration struct {
+	NetworkInterfaces []NetworkInterface
+	CNI               *CNIConfiguration
+}
+
+type CNIConfiguration struct {
+	CNINetworkName string
+	CNIBinPath     string // TODO this should be able to be a PATH like foo:bar:baz, also has a default
+	CNIConfDir     string // TODO this is just a dir, also has a default
+}
+
 type NetworkInterface struct {
 	// MacAddress defines the MAC address that should be assigned to the network
 	// interface inside the microVM.
@@ -243,6 +261,12 @@ func NewMachine(ctx context.Context, cfg Config, opts ...Opt) (*Machine, error) 
 			Build(ctx)
 	}
 
+	if cfg.Network.CNI != nil {
+		if len(cfg.Network.NetworkInterfaces) > 0 {
+			return nil, errors.New("cannot specify CNI configuration and network interfaces")
+		}
+	}
+
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -267,6 +291,30 @@ func NewMachine(ctx context.Context, cfg Config, opts ...Opt) (*Machine, error) 
 	return m, nil
 }
 
+// TODO does CNI have a library for doing this?
+func newNetNS(destPath string) error {
+	doneCh := make(chan error)
+	go func() {
+		defer close(doneCh)
+		runtime.LockOSThread()
+		// No need to unlock, just discard this OS thread when done
+
+		err := unix.Unshare(unix.CLONE_NEWNET)
+		if err != nil {
+			doneCh <- errors.Wrap(err, "failed to unshare netns")
+			return
+		}
+
+		err = unix.Mount("/proc/thread-self/ns/net", destPath, "none", unix.MS_BIND, "none")
+		if err != nil {
+			doneCh <- errors.Wrap(err, "failed to mount net ns")
+			return
+		}
+	}()
+
+	return <-doneCh
+}
+
 // Start will iterate through the handler list and call each handler. If an
 // error occurred during handler execution, that error will be returned. If the
 // handlers succeed, then this will start the VMM instance.
@@ -283,11 +331,67 @@ func (m *Machine) Start(ctx context.Context) error {
 		return ErrAlreadyStarted
 	}
 
-	if err := m.Handlers.Run(ctx, m); err != nil {
-		return err
+	// TODO make this a handler?
+	// TODO or run this as part of NewMachine? Which will allow callers to easily see the network interfaces that are generated
+	netnsPath := "/proc/thread-self/ns/net"
+	if m.cfg.Network.CNI != nil {
+		// TODO what's a better way of getting a unique path for the VM?
+		netnsPath = filepath.Join(filepath.Dir(m.socketPath()), "netns")
+
+		err := ioutil.WriteFile(netnsPath, nil, 0600)
+		if err != nil {
+			return errors.Wrapf(err, "failed to touch netns path at %q", netnsPath)
+		}
+
+		err = newNetNS(netnsPath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create netns for VM at path %q", netnsPath)
+		}
+
+		// TODO default somewhere for CNIBinPath
+		cniPlugin := libcni.NewCNIConfig([]string{m.cfg.Network.CNI.CNIBinPath}, nil)
+		networkConf, err := libcni.LoadConfList(m.cfg.Network.CNI.CNIConfDir, m.cfg.Network.CNI.CNINetworkName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to load CNI configuration from dir %q for network %q",
+				m.cfg.Network.CNI.CNIConfDir, m.cfg.Network.CNI.CNINetworkName)
+		}
+
+		cniResult, err := cniPlugin.AddNetworkList(ctx, networkConf, &libcni.RuntimeConf{
+			ContainerID: netnsPath,
+			NetNS:       netnsPath,
+			IfName:      "veth0", // TODO how does client actually pass this?
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to create CNI network")
+		}
+
+		vmNetConf, err := util.VMNetConfFrom(cniResult, netnsPath)
+		if err != nil {
+			return errors.Wrap(err, "failed to get vm net conf from cni output")
+		}
+
+		m.cfg.Network.NetworkInterfaces = []NetworkInterface{{
+			HostDevName: vmNetConf.TapName,
+			MacAddress:  vmNetConf.MacAddr,
+			// TODO what about MMDS? Network Rate Limiters?
+		}}
+
+		m.cfg.KernelArgs = strings.Join([]string{m.cfg.KernelArgs,
+			fmt.Sprintf("ip=%s", vmNetConf.IPBootParam())}, " ") // TODO throw error if ip= is already there
 	}
 
-	return m.startInstance(ctx)
+	netns, err := ns.GetNS(netnsPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to get netns of the firecracker VM")
+	}
+
+	return netns.Do(func(_ ns.NetNS) error {
+		if err := m.Handlers.Run(ctx, m); err != nil {
+			return err
+		}
+
+		return m.startInstance(ctx)
+	})
 }
 
 // Shutdown requests a clean shutdown of the VM by sending CtrlAltDelete on the virtual keyboard
