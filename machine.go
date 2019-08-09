@@ -33,7 +33,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/firecracker-microvm/firecracker-containerd/tc-redirect/util"
+	"github.com/firecracker-microvm/firecracker-containerd/tc-redirect/vmconf"
 	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -365,7 +365,7 @@ func (m *Machine) Start(ctx context.Context) error {
 			return errors.Wrap(err, "failed to create CNI network")
 		}
 
-		vmNetConf, err := util.VMNetConfFrom(cniResult, netnsPath)
+		vmNetConf, err := vmconf.VMNetConfFrom(cniResult, netnsPath)
 		if err != nil {
 			return errors.Wrap(err, "failed to get vm net conf from cni output")
 		}
