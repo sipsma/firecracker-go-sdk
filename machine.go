@@ -185,10 +185,12 @@ type NetworkConfiguration struct {
 	CNI               *CNIConfiguration
 }
 
+// TODO update cni doc w/ IfName
 type CNIConfiguration struct {
-	CNINetworkName string
-	CNIBinPath     string // TODO this should be able to be a PATH like foo:bar:baz, also has a default
-	CNIConfDir     string // TODO this is just a dir, also has a default
+	NetworkName string
+	IfName      string // TODO this could be confusing (easy to think it's the tap name), also is default per plugin?
+	BinPath     string // TODO this should be able to be a PATH like foo:bar:baz, also has a default
+	ConfDir     string // TODO this is just a dir, also has a default
 }
 
 type NetworkInterface struct {
@@ -349,17 +351,17 @@ func (m *Machine) Start(ctx context.Context) error {
 		}
 
 		// TODO default somewhere for CNIBinPath
-		cniPlugin := libcni.NewCNIConfig([]string{m.cfg.Network.CNI.CNIBinPath}, nil)
-		networkConf, err := libcni.LoadConfList(m.cfg.Network.CNI.CNIConfDir, m.cfg.Network.CNI.CNINetworkName)
+		cniPlugin := libcni.NewCNIConfig([]string{m.cfg.Network.CNI.BinPath}, nil)
+		networkConf, err := libcni.LoadConfList(m.cfg.Network.CNI.ConfDir, m.cfg.Network.CNI.NetworkName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to load CNI configuration from dir %q for network %q",
-				m.cfg.Network.CNI.CNIConfDir, m.cfg.Network.CNI.CNINetworkName)
+				m.cfg.Network.CNI.ConfDir, m.cfg.Network.CNI.NetworkName)
 		}
 
 		cniResult, err := cniPlugin.AddNetworkList(ctx, networkConf, &libcni.RuntimeConf{
 			ContainerID: netnsPath,
 			NetNS:       netnsPath,
-			IfName:      "veth0", // TODO how does client actually pass this?
+			IfName:      m.cfg.Network.CNI.IfName,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to create CNI network")
