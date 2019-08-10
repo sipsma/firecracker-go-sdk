@@ -367,7 +367,7 @@ func (m *Machine) Start(ctx context.Context) error {
 			return errors.Wrap(err, "failed to create CNI network")
 		}
 
-		vmNetConf, err := vmconf.VMNetConfFrom(cniResult, netnsPath)
+		vmNetConf, err := vmconf.VMNetConfFrom(cniResult)
 		if err != nil {
 			return errors.Wrap(err, "failed to get vm net conf from cni output")
 		}
