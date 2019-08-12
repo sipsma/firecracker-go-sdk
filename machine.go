@@ -367,14 +367,14 @@ func (m *Machine) Start(ctx context.Context) error {
 			return errors.Wrap(err, "failed to create CNI network")
 		}
 
-		vmNetConf, err := vmconf.VMNetConfFrom(cniResult)
+		vmNetConf, err := vmconf.StaticNetworkConfFrom(cniResult)
 		if err != nil {
 			return errors.Wrap(err, "failed to get vm net conf from cni output")
 		}
 
 		m.cfg.Network.NetworkInterfaces = []NetworkInterface{{
-			HostDevName: vmNetConf.TapName,
-			MacAddress:  vmNetConf.MacAddr,
+			HostDevName: vmNetConf.HostTapName,
+			MacAddress:  vmNetConf.VMMacAddr,
 			// TODO what about MMDS? Network Rate Limiters?
 		}}
 
