@@ -200,11 +200,14 @@ type RateLimiterSet struct {
 // VsockDevice represents a vsock connection between the host and the guest
 // microVM.
 type VsockDevice struct {
-	// Path defines the filesystem path of the vsock device on the host.
-	Path string
 	// CID defines the 32-bit Context Identifier for the vsock device.  See
 	// the vsock(7) manual page for more information.
 	CID uint32
+
+	// UDSPath is the path on the host to the unix domain socket endpoint for
+	// the vsock. See the Firecracker docs for more information:
+	// https://github.com/firecracker-microvm/firecracker/blob/master/docs/vsock.md
+	UDSPath string
 }
 
 // SocketPath returns the filesystem path to the socket used for VMM
@@ -608,15 +611,16 @@ func (m *Machine) attachDrive(ctx context.Context, dev models.Drive) error {
 // addVsock adds a vsock to the instance
 func (m *Machine) addVsock(ctx context.Context, dev VsockDevice) error {
 	vsockCfg := models.Vsock{
-		GuestCid: int64(dev.CID),
-		ID:       &dev.Path,
+		GuestCid: Int64(int64(dev.CID)),
+		UdsPath:  &dev.UDSPath,
+		VsockID:  &dev.UDSPath, // TODO ?
 	}
 
-	resp, _, err := m.client.PutGuestVsockByID(ctx, dev.Path, &vsockCfg)
+	resp, err := m.client.PutGuestVsock(ctx, &vsockCfg)
 	if err != nil {
 		return err
 	}
-	m.logger.Debugf("Attach vsock %s successful: %s", dev.Path, resp.Error())
+	m.logger.Debugf("Attach vsock %s successful: %s", dev.UDSPath, resp.Error())
 	return nil
 }
 
