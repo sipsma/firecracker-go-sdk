@@ -193,6 +193,7 @@ func (f *Client) PutGuestVsock(ctx context.Context, vsock *models.Vsock, opts ..
 	params := ops.NewPutGuestVsockByIDParams()
 	params.SetContext(ctx)
 	params.SetBody(vsock)
+	params.SetID(*vsock.VsockID)
 	for _, opt := range opts {
 		opt(params)
 	}

@@ -35,12 +35,13 @@ type Vsock struct {
 	// Minimum: 3
 	GuestCid *int64 `json:"guest_cid"`
 
-	// id
-	ID string `json:"id,omitempty"`
-
 	// Path to UNIX domain socket, used to proxy vsock connections.
 	// Required: true
 	UdsPath *string `json:"uds_path"`
+
+	// vsock id
+	// Required: true
+	VsockID *string `json:"vsock_id"`
 }
 
 // Validate validates this vsock
@@ -52,6 +53,10 @@ func (m *Vsock) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateUdsPath(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateVsockID(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -77,6 +82,15 @@ func (m *Vsock) validateGuestCid(formats strfmt.Registry) error {
 func (m *Vsock) validateUdsPath(formats strfmt.Registry) error {
 
 	if err := validate.Required("uds_path", "body", m.UdsPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Vsock) validateVsockID(formats strfmt.Registry) error {
+
+	if err := validate.Required("vsock_id", "body", m.VsockID); err != nil {
 		return err
 	}
 

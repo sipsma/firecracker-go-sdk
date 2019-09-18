@@ -661,7 +661,7 @@ definitions:
       - guest_cid
       - uds_path
     properties:
-      id:
+      vsock_id:
         type: string
       guest_cid:
         type: integer
@@ -670,3 +670,4 @@ definitions:
       uds_path:
         type: string
         description: Path to UNIX domain socket, used to proxy vsock connections.
+

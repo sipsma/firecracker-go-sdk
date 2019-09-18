@@ -613,8 +613,8 @@ func (m *Machine) addVsock(ctx context.Context, dev VsockDevice) error {
 	vsockCfg := models.Vsock{
 		GuestCid: Int64(int64(dev.CID)),
 		UdsPath:  &dev.UDSPath,
-		ID:       dev.UDSPath, // TODO ?
-		// VsockID:  &dev.UDSPath, // TODO ?
+		// ID:       dev.UDSPath, // TODO ?
+		VsockID: String(strconv.Itoa(int(dev.CID))), // TODO ?
 	}
 
 	resp, err := m.client.PutGuestVsock(ctx, &vsockCfg)
