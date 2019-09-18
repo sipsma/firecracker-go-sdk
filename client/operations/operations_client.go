@@ -396,32 +396,32 @@ func (a *Client) PutGuestNetworkInterfaceByID(params *PutGuestNetworkInterfaceBy
 }
 
 /*
-PutGuestVsock creates updates a vsock device
+PutGuestVsockByID creates new vsock with ID specified by the id parameter
 
-The first call creates the device with the configuration specified in body. Subsequent calls will update the device configuration. May fail if update is not possible.
+If the vsock device with the specified ID already exists, its body will be updated based on the new input. May fail if update is not possible.
 */
-func (a *Client) PutGuestVsock(params *PutGuestVsockParams) (*PutGuestVsockNoContent, error) {
+func (a *Client) PutGuestVsockByID(params *PutGuestVsockByIDParams) (*PutGuestVsockByIDNoContent, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
-		params = NewPutGuestVsockParams()
+		params = NewPutGuestVsockByIDParams()
 	}
 
 	result, err := a.transport.Submit(&runtime.ClientOperation{
-		ID:                 "putGuestVsock",
+		ID:                 "putGuestVsockByID",
 		Method:             "PUT",
-		PathPattern:        "/vsock",
+		PathPattern:        "/vsocks/{id}",
 		ProducesMediaTypes: []string{"application/json"},
 		ConsumesMediaTypes: []string{"application/json"},
 		Schemes:            []string{"http"},
 		Params:             params,
-		Reader:             &PutGuestVsockReader{formats: a.formats},
+		Reader:             &PutGuestVsockByIDReader{formats: a.formats},
 		Context:            params.Context,
 		Client:             params.HTTPClient,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*PutGuestVsockNoContent), nil
+	return result.(*PutGuestVsockByIDNoContent), nil
 
 }
 
@@ -503,7 +503,7 @@ type ClientIface interface {
 	PutGuestBootSource(params *PutGuestBootSourceParams) (*PutGuestBootSourceNoContent, error)
 	PutGuestDriveByID(params *PutGuestDriveByIDParams) (*PutGuestDriveByIDNoContent, error)
 	PutGuestNetworkInterfaceByID(params *PutGuestNetworkInterfaceByIDParams) (*PutGuestNetworkInterfaceByIDNoContent, error)
-	PutGuestVsock(params *PutGuestVsockParams) (*PutGuestVsockNoContent, error)
+	PutGuestVsockByID(params *PutGuestVsockByIDParams) (*PutGuestVsockByIDNoContent, error)
 	PutLogger(params *PutLoggerParams) (*PutLoggerNoContent, error)
 	PutMachineConfiguration(params *PutMachineConfigurationParams) (*PutMachineConfigurationNoContent, error)
 }

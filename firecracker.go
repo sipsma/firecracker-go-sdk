@@ -185,19 +185,19 @@ func (f *Client) PutGuestDriveByID(ctx context.Context, driveID string, drive *m
 
 // PutGuestVsockOpt is a functional option to be used for the
 // PutGuestVsockParams API in setting any additional optional fields.
-type PutGuestVsockOpt func(*ops.PutGuestVsockParams)
+type PutGuestVsockOpt func(*ops.PutGuestVsockByIDParams)
 
 // PutGuestVsockByID is a wrapper for the swagger generated client to make
 // calling of the API easier.
-func (f *Client) PutGuestVsock(ctx context.Context, vsock *models.Vsock, opts ...PutGuestVsockOpt) (*ops.PutGuestVsockNoContent, error) {
-	params := ops.NewPutGuestVsockParams()
+func (f *Client) PutGuestVsock(ctx context.Context, vsock *models.Vsock, opts ...PutGuestVsockOpt) (*ops.PutGuestVsockByIDNoContent, error) {
+	params := ops.NewPutGuestVsockByIDParams()
 	params.SetContext(ctx)
 	params.SetBody(vsock)
 	for _, opt := range opts {
 		opt(params)
 	}
 
-	return f.client.Operations.PutGuestVsock(params)
+	return f.client.Operations.PutGuestVsockByID(params)
 }
 
 // CreateSyncActionOpt is a functional option to be used for the
