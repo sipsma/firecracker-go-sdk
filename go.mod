@@ -1,6 +1,6 @@
 module github.com/firecracker-microvm/firecracker-go-sdk
 
-go 1.11
+go 1.13
 
 require (
 	github.com/containernetworking/cni v0.7.2-0.20190807151350-8c6c47d1c7fc
