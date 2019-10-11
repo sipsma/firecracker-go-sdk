@@ -17,6 +17,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -302,6 +303,13 @@ func (cniConf CNIConfiguration) asCNIRuntimeConf() *libcni.RuntimeConf {
 
 func (cniConf CNIConfiguration) invokeCNI(ctx context.Context, logger *log.Entry) (*types.Result, error, []func() error) {
 	var cleanupFuncs []func() error
+
+	for i := 0; i < 128; i++ {
+		err := exec.Command("true").Run()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to run true"), cleanupFuncs
+		}
+	}
 
 	cniPlugin := libcni.NewCNIConfigWithCacheDir(cniConf.BinPath, cniConf.CacheDir, nil)
 
