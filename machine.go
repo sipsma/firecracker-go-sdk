@@ -445,6 +445,8 @@ func (m *Machine) startVMM(ctx context.Context) error {
 	}
 	m.logger.Debugf("VMM started socket path is %s", m.Cfg.SocketPath)
 
+	m.logger.Infof("VMM PID: %d", m.cmd.Process.Pid)
+
 	m.cleanupFuncs = append(m.cleanupFuncs,
 		func() error {
 			if err := os.Remove(m.Cfg.SocketPath); !os.IsNotExist(err) {
@@ -492,7 +494,7 @@ func (m *Machine) startVMM(ctx context.Context) error {
 	}()
 
 	// Wait for firecracker to initialize:
-	err = m.waitForSocket(3*time.Second, errCh)
+	err = m.waitForSocket(10*time.Second, errCh)
 	if err != nil {
 		err = errors.Wrapf(err, "Firecracker did not create API socket %s", m.Cfg.SocketPath)
 		m.fatalErr = err
@@ -775,6 +777,21 @@ func (m *Machine) sendCtrlAltDel(ctx context.Context) error {
 		m.logger.Printf("Sent instance shutdown request: %s", resp.Error())
 	} else {
 		m.logger.Errorf("Unable to send CtrlAltDel: %s", err)
+	}
+	return err
+}
+
+func (m *Machine) FlushMetrics(ctx context.Context) error {
+	action := models.InstanceActionInfoActionTypeFlushMetrics
+	info := models.InstanceActionInfo{
+		ActionType: &action,
+	}
+
+	resp, err := m.client.CreateSyncAction(ctx, &info)
+	if err == nil {
+		m.logger.Printf("Sent instance metrics flush request: %s", resp.Error())
+	} else {
+		m.logger.Errorf("Unable to flush metrics: %s", err)
 	}
 	return err
 }
