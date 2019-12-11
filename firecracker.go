@@ -26,7 +26,7 @@ import (
 	ops "github.com/firecracker-microvm/firecracker-go-sdk/client/operations"
 )
 
-const firecrackerRequestTimeout = 500 * time.Millisecond
+const firecrackerRequestTimeout = 20 * time.Second
 
 // newFirecrackerClient creates a FirecrackerClient
 func newFirecrackerClient(socketPath string, logger *logrus.Entry, debug bool) *client.Firecracker {
@@ -170,7 +170,7 @@ type PutGuestDriveByIDOpt func(*ops.PutGuestDriveByIDParams)
 // PutGuestDriveByID is a wrapper for the swagger generated client to make
 // calling of the API easier.
 func (f *Client) PutGuestDriveByID(ctx context.Context, driveID string, drive *models.Drive, opts ...PutGuestDriveByIDOpt) (*ops.PutGuestDriveByIDNoContent, error) {
-	timeout, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+	timeout, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
 	params := ops.NewPutGuestDriveByIDParamsWithContext(timeout)

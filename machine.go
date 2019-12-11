@@ -492,7 +492,7 @@ func (m *Machine) startVMM(ctx context.Context) error {
 	}()
 
 	// Wait for firecracker to initialize:
-	err = m.waitForSocket(3*time.Second, errCh)
+	err = m.waitForSocket(20*time.Second, errCh)
 	if err != nil {
 		err = errors.Wrapf(err, "Firecracker did not create API socket %s", m.Cfg.SocketPath)
 		m.fatalErr = err
